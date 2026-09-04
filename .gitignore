@@ -7,3 +7,9 @@ desktop.ini
 __pycache__/
 *.pyc
 *.tmp
+
+# Instaladores (ficam so na pasta local, nao vao para o GitHub)
+*.exe
+*.msi
+*.zip
+OracleClient/
