@@ -1,0 +1,9 @@
+# Nunca enviar a configuracao (tem dados de acesso ao banco)
+atualizar/config.ini
+
+# Lixo do Windows e do Python
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc
+*.tmp
