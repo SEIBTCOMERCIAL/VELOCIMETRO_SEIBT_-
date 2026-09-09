@@ -8,7 +8,7 @@
 
 const ARQUIVO_DADOS = "dados.json";
 const INTERVALO_SEGUNDOS = 60;   // de quanto em quanto tempo procura numero novo
-const MINUTOS_PARA_AVISAR = 30;  // se o dado for mais velho que isso, avisa na tela
+const MINUTOS_PARA_AVISAR = 62;  // se o dado for mais velho que isso, avisa na tela
 
 /* --- Constantes copiadas das medidas do Power BI --------------------------- */
 const META_ANUAL      = 43100000;
