@@ -49,7 +49,7 @@ Windows (passo a passo abaixo).
 ### Se os números pararem de atualizar
 
 O próprio painel avisa na tela quando os números estão parados há mais de
-30 minutos. Se isso aparecer, rode o `atualizar\atualizar.bat` na mão e leia
+2 horas. Se isso aparecer, rode o `atualizar\atualizar.bat` na mão e leia
 a mensagem que aparecer na janela.
 
 ## Trocar meta ou ponto de equilíbrio
