@@ -128,10 +128,10 @@ document.getElementById('brand-logo').src = 'data:image/png;base64,iVBORw0KGgoAA
 
 
 const CONFIG = Object.freeze([
- { key: "pedidos_mes", title: "Pedidos", period: "Mês atual", goal: 3500000, max: 6000000, pe: 2650000, type: "order" },
- { key: "faturamento_mes", title: "Faturamento", period: "Mês atual", goal: 3500000, max: 6000000, pe: 2650000, type: "invoice" },
- { key: "pedidos_trimestre", title: "Pedidos", period: "Trimestre atual", goal: 10500000, max: 18000000, pe: 7950000, type: "order" },
- { key: "faturamento_trimestre", title: "Faturamento", period: "Trimestre atual", goal: 10500000, max: 18000000, pe: 7950000, type: "invoice" }
+ { key: "pedidos_mes", title: "Pedidos", period: "Mês atual", goal: 3580000, max: 6000000, pe: 2650000, type: "order" },
+ { key: "faturamento_mes", title: "Faturamento", period: "Mês atual", goal: 3580000, max: 6000000, pe: 2650000, type: "invoice" },
+ { key: "pedidos_trimestre", title: "Pedidos", period: "Trimestre atual", goal: 10740000, max: 18000000, pe: 7950000, type: "order" },
+ { key: "faturamento_trimestre", title: "Faturamento", period: "Trimestre atual", goal: 10740000, max: 18000000, pe: 7950000, type: "invoice" }
 ]);
 const money = n => new Intl.NumberFormat("pt-BR", {style: "currency", currency: "BRL"}).format(n);
 const percent = n => new Intl.NumberFormat("pt-BR", {maximumFractionDigits: 1}).format(n) + "%";
