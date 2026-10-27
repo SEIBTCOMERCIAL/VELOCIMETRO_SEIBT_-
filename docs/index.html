@@ -211,7 +211,7 @@ function draw(data, published) {
   const time = new Intl.DateTimeFormat("pt-BR", {timeZone:"America/Sao_Paulo", dateStyle:"short", timeStyle:"short"}).format(published);
   document.getElementById("period").textContent = monthYear;
   document.getElementById("cutoff").textContent = cut;
-  document.getElementById("timestamp").textContent = `${time} · São Paulo`;
+  document.getElementById("timestamp").textContent = `${time} · Nova Petropolis-RS`;
   document.getElementById("gauges").innerHTML = CONFIG.map(cfg => card(cfg, data[cfg.key])).join("");
   document.getElementById("notice").textContent = `Fechamento manual conferido até ${cut}. Os valores mudam somente após uma nova publicação.`;
   setState("Dados publicados");
