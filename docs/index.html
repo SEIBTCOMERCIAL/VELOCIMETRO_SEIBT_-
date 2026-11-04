@@ -105,6 +105,15 @@ footer { flex: none; display: flex; justify-content: space-between; align-items:
 .cutoff { border-left:1px solid #d4d9e3; padding-left:3.4vw; }
 footer p { color:#626b7d; font-size:clamp(10px,.68vw,14px); margin:0; line-height:1.45; }
 @media (max-width:700px) { .cutoff { padding-left:14px; } }
+.history-bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:10px 2.4vw 0; }
+.history-bar label { font-size:12px; font-weight:600; color:var(--muted); }
+.history-bar select, .history-bar button { background:white; color:var(--ink); border:1px solid #cdd4e0; border-radius:6px; padding:7px 10px; font-size:13px; }
+.history-bar button[hidden] { display:none; }
+#history-notice { color:#815318; font-size:12px; }
+.status-history { background:#edf2fc; color:#1f5fbf; border-color:#b8ccec; }
+.status-history::before { background:#1f5fbf; }
+.context { flex-wrap:wrap; row-gap:10px; }
+@media (max-width:700px) { .history-bar { padding:12px 16px 0; } .context .snapshot { border-left:0; padding-left:0; } }
 </style>
 </head>
 <body>
@@ -113,6 +122,12 @@ footer p { color:#626b7d; font-size:clamp(10px,.68vw,14px); margin:0; line-heigh
   <div class="heading"><p class="eyebrow">ACOMPANHAMENTO COMERCIAL</p><h1>Pedidos e faturamento<span class="title-dot">.</span></h1></div>
   <div class="brand"><img id="brand-logo" alt="SEIBT"></div>
 </header>
+<nav class="history-bar" aria-label="Consulta por mês">
+  <label for="month-select">Exibir período</label>
+  <select id="month-select"><option value="atual">Atual</option></select>
+  <button id="back-current" type="button" hidden>Voltar ao atual</button>
+  <span id="history-notice" role="status"></span>
+</nav>
 <section class="context" aria-label="Referência dos dados">
   <div><span class="context-label">PERÍODO</span><strong id="period">Carregando…</strong></div>
   <div class="cutoff"><span class="context-label">FECHAMENTO ATÉ</span><strong id="cutoff">—</strong></div>
@@ -170,88 +185,159 @@ function card(cfg,value) {
  return `<section class="card" aria-labelledby="title-${cfg.key}">
  <div class="card-header"><div class="card-title"><span class="card-icon">${icon(cfg.type)}</span><h2 id="title-${cfg.key}">${cfg.title}</h2></div><span class="period">${cfg.period}</span></div>
  <div class="gauge">${gauge(cfg,value)}</div>
- <div class="card-bottom"><div class="metric"><span class="target-label">Meta do ${cfg.period === "Mês atual" ? "mês" : "trimestre"}</span><strong>${money(cfg.goal)}</strong></div>
+ <div class="card-bottom"><div class="metric"><span class="target-label">Meta do ${cfg.key.endsWith("_mes") ? "mês" : "trimestre"}</span><strong>${money(cfg.goal)}</strong></div>
  <div class="metric"><span>${!valid ? "Situação" : reached ? "Acima da meta" : "Falta para a meta"}</span><strong>${valid ? money(Math.abs(cfg.goal-value)) : "Pendente"}</strong></div></div></section>`;
 }
 
-
 const SOURCE = "dados.json";
 const REFRESH_MS = 60000;
+const selection = document.getElementById("month-select");
+const backCurrent = document.getElementById("back-current");
+const historyNotice = document.getElementById("history-notice");
 let lastGood = null;
+let currentError = false;
+let currentRequest = 0;
+let historyRequest = 0;
+let archives = new Map();
 
 function brDate(iso) {
-  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
-    throw new Error("Data de corte ausente ou inválida");
-  const [year, month, day] = iso.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day)
-    throw new Error("Data de corte inválida");
-  return `${String(day).padStart(2,"0")}/${String(month).padStart(2,"0")}/${year}`;
+  if (typeof iso !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error("Data de corte inválida");
+  const [y,m,d] = iso.split("-").map(Number);
+  const date = new Date(Date.UTC(y,m-1,d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m-1 || date.getUTCDate() !== d) throw new Error("Data de corte inválida");
+  return String(d).padStart(2,"0")+"/"+String(m).padStart(2,"0")+"/"+y;
+}
+function monthLabel(month) {
+  return new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",month:"long",year:"numeric"})
+    .format(new Date(month+"-15T12:00:00-03:00"));
 }
 function validate(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Dados inválidos");
   brDate(data.data_corte);
   if (data.fuso_horario !== "America/Sao_Paulo") throw new Error("Fuso horário inválido");
-  const published = new Date(data.atualizado_em);
-  if (!Number.isFinite(published.getTime())) throw new Error("Horário de publicação inválido");
-  for (const cfg of CONFIG) {
-    if (!hasValue(data[cfg.key])) throw new Error(`Valor inválido: ${cfg.key}`);
+  if (typeof data.atualizado_em !== "string" || !Number.isFinite(new Date(data.atualizado_em).getTime())) throw new Error("Publicação inválida");
+  for (const cfg of CONFIG) if (!hasValue(data[cfg.key])) throw new Error("Valor inválido: "+cfg.key);
+  return data;
+}
+function parseHistory(payload) {
+  if (!payload || payload.versao !== 1 || !Array.isArray(payload.meses)) throw new Error("Histórico inválido");
+  const next = new Map();
+  for (const entry of payload.meses) {
+    if (!entry || typeof entry.mes !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry.mes) || next.has(entry.mes)) throw new Error("Mês inválido ou duplicado");
+    validate(entry.dados);
+    const [y,m] = entry.mes.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y,m,0)).getUTCDate();
+    if (entry.dados.data_corte !== entry.mes+"-"+lastDay) throw new Error("Fechamento não corresponde ao fim do mês");
+    const configs = CONFIG.map(base => {
+      const saved = entry.indicadores && entry.indicadores[base.key];
+      if (!saved || !hasValue(saved.meta) || saved.meta <= 0 || !hasValue(saved.escala) ||
+          saved.escala < saved.meta || !hasValue(saved.ponto_equilibrio) || saved.ponto_equilibrio > saved.meta)
+        throw new Error("Metas históricas inválidas");
+      return {...base, goal:saved.meta, max:saved.escala, pe:saved.ponto_equilibrio,
+        period:base.key.endsWith("_mes") ? "Mês encerrado" : "Trimestre até "+brDate(entry.dados.data_corte).slice(0,5)};
+    });
+    next.set(entry.mes,{data:entry.dados,configs});
   }
-  return published;
+  return new Map([...next.entries()].sort((a,b)=>b[0].localeCompare(a[0])));
 }
-function setState(label, error = false) {
-  const el = document.getElementById("status");
-  el.textContent = label;
-  el.classList.toggle("status-error", error);
+function setState(label,error=false) {
+  const el=document.getElementById("status");
+  el.textContent=label;
+  el.classList.toggle("status-error",error);
+  el.classList.toggle("status-history",selection.value!=="atual");
 }
-function draw(data, published) {
-  const cut = brDate(data.data_corte);
-  const date = new Date(`${data.data_corte}T12:00:00-03:00`);
-  const monthYear = new Intl.DateTimeFormat("pt-BR", {timeZone:"America/Sao_Paulo", month:"long", year:"numeric"}).format(date);
-  const time = new Intl.DateTimeFormat("pt-BR", {timeZone:"America/Sao_Paulo", dateStyle:"short", timeStyle:"short"}).format(published);
-  document.getElementById("period").textContent = monthYear;
-  document.getElementById("cutoff").textContent = cut;
-  document.getElementById("timestamp").textContent = `${time} · Nova Petropolis-RS`;
-  document.getElementById("gauges").innerHTML = CONFIG.map(cfg => card(cfg, data[cfg.key])).join("");
-  document.getElementById("notice").textContent = `Fechamento manual conferido até ${cut}. Os valores mudam somente após uma nova publicação.`;
-  setState("Dados publicados");
-  lastGood = data;
+function draw(data,configs,historical) {
+  const cut=brDate(data.data_corte);
+  const name=monthLabel(data.data_corte.slice(0,7));
+  const time=new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",dateStyle:"short",timeStyle:"short"}).format(new Date(data.atualizado_em));
+  document.getElementById("period").textContent=(historical ? "Histórico — " : "")+name;
+  document.getElementById("cutoff").textContent=cut;
+  document.getElementById("timestamp").textContent=time+" · Nova Petropolis-RS";
+  document.getElementById("gauges").innerHTML=configs.map(cfg=>card(cfg,data[cfg.key])).join("");
+  document.getElementById("notice").textContent=historical
+    ? "Fechamento arquivado de "+name+". O trimestre mostra a posição acumulada até "+cut+". Metas e limites preservados desse período."
+    : "Fechamento manual conferido até "+cut+". Os valores mudam somente após uma nova publicação.";
+  setState(historical ? "Histórico · mês encerrado" : "Dados publicados");
+}
+function showSelected() {
+  const historical=selection.value!=="atual";
+  backCurrent.hidden=!historical;
+  if (historical) {
+    const record=archives.get(selection.value);
+    if (record) draw(record.data,record.configs,true);
+    return;
+  }
+  if (lastGood) {
+    draw(lastGood,CONFIG,false);
+    if (currentError) {
+      setState("Atualização indisponível · última posição exibida",true);
+      document.getElementById("notice").textContent="Não foi possível atualizar os dados. Mantida a última posição recebida, com corte em "+brDate(lastGood.data_corte)+".";
+    }
+  } else {
+    document.getElementById("period").textContent="Atual";
+    document.getElementById("cutoff").textContent="—";
+    document.getElementById("timestamp").textContent="—";
+    document.getElementById("gauges").innerHTML=CONFIG.map(cfg=>card(cfg,null)).join("");
+    setState(currentError ? "Dados indisponíveis" : "Carregando dados",currentError);
+    document.getElementById("notice").textContent=currentError ? "Não foi possível carregar os dados atuais. Verifique a conexão e o arquivo publicado." : "Carregando fechamento publicado…";
+  }
 }
 async function refresh() {
+  const request=++currentRequest;
   try {
-    const response = await fetch(`${SOURCE}?t=${Date.now()}`, {cache:"no-store"});
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const published = validate(data);
-    draw(data, published);
-  } catch (error) {
-    setState(lastGood ? "Sem conexão · última posição exibida" : "Dados indisponíveis", true);
-    document.getElementById("notice").textContent = lastGood
-      ? `A conexão falhou. Mantida a última posição recebida, com corte em ${brDate(lastGood.data_corte)}.`
-      : "Não foi possível carregar os dados publicados. Verifique a conexão.";
+    const response=await fetch(SOURCE+"?t="+Date.now(),{cache:"no-store"});
+    if (!response.ok) throw new Error("HTTP "+response.status);
+    const data=validate(await response.json());
+    if (request!==currentRequest) return;
+    lastGood=data;
+    currentError=false;
+  } catch {
+    if (request!==currentRequest) return;
+    currentError=true;
+  }
+  if (selection.value==="atual") showSelected();
+}
+async function loadHistory() {
+  const request=++historyRequest;
+  try {
+    const response=await fetch("historico.json?t="+Date.now(),{cache:"no-store"});
+    if (!response.ok) throw new Error("HTTP "+response.status);
+    const next=parseHistory(await response.json());
+    if (request!==historyRequest) return;
+    // Never silently replace a selected archive with current values.
+    if (selection.value!=="atual" && !next.has(selection.value)) throw new Error("Mês selecionado não está mais disponível");
+    const chosen=selection.value;
+    archives=next;
+    selection.replaceChildren(new Option("Atual","atual"));
+    for (const month of archives.keys()) selection.add(new Option(monthLabel(month),month));
+    selection.value=chosen;
+    historyNotice.textContent=archives.size ? "" : "Nenhum mês arquivado.";
+    if (chosen!=="atual") showSelected();
+  } catch {
+    if (request!==historyRequest) return;
+    historyNotice.textContent=archives.size
+      ? "Histórico não atualizado. Mantidas as posições já carregadas."
+      : "Histórico indisponível. Os dados atuais continuam disponíveis.";
   }
 }
-
-document.getElementById("gauges").innerHTML = CONFIG.map(cfg => card(cfg, null)).join("");
+selection.addEventListener("change",()=>{ showSelected(); if(selection.value==="atual") refresh(); });
+backCurrent.addEventListener("click",()=>{selection.value="atual";showSelected();refresh();});
+showSelected();
 refresh();
-setInterval(refresh, REFRESH_MS);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-document.getElementById("fullscreen").addEventListener("click", async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await document.documentElement.requestFullscreen();
-  } catch { document.getElementById("fullscreen").textContent = "Use F11 para tela cheia"; }
+loadHistory();
+setInterval(()=>{refresh();loadHistory();},REFRESH_MS);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();loadHistory();}});
+document.getElementById("fullscreen").addEventListener("click",async()=>{
+  try {if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen();}
+  catch {document.getElementById("fullscreen").textContent="Use F11 para tela cheia";}
 });
-
-// O painel anterior guardava a página em cache. Remove apenas a cópia SEIBT
-// para que o endereço normal volte a abrir esta versão atual.
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistration("./").then(reg => {
-    if (reg && new URL(reg.scope).pathname.includes("VELOCIMETRO_SEIBT_-")) reg.unregister();
-  }).catch(() => {});
+  navigator.serviceWorker.getRegistration("./").then(reg=>{
+    if(reg && new URL(reg.scope).pathname.includes("VELOCIMETRO_SEIBT_-")) reg.unregister();
+  }).catch(()=>{});
 }
 if ("caches" in window) {
-  caches.keys().then(keys => Promise.all(keys.filter(k => /^seibt-(app|dados)-/.test(k)).map(k => caches.delete(k)))).catch(() => {});
+  caches.keys().then(keys=>Promise.all(keys.filter(k=>/^seibt-(app|dados)-/.test(k)).map(k=>caches.delete(k)))).catch(()=>{});
 }
 
 </script>
