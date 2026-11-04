@@ -1,0 +1,39 @@
+{
+  "versao": 1,
+  "meses": [
+    {
+      "mes": "2026-10",
+      "dados": {
+        "atualizado_em": "2026-11-03T10:00:11-03:00",
+        "data_corte": "2026-10-31",
+        "fuso_horario": "America/Sao_Paulo",
+        "pedidos_mes": 3694637.67,
+        "faturamento_mes": 1307261.34,
+        "pedidos_trimestre": 3694637.67,
+        "faturamento_trimestre": 1307261.34
+      },
+      "indicadores": {
+        "pedidos_mes": {
+          "meta": 3580000,
+          "escala": 6000000,
+          "ponto_equilibrio": 2650000
+        },
+        "faturamento_mes": {
+          "meta": 3580000,
+          "escala": 6000000,
+          "ponto_equilibrio": 2650000
+        },
+        "pedidos_trimestre": {
+          "meta": 10740000,
+          "escala": 18000000,
+          "ponto_equilibrio": 7950000
+        },
+        "faturamento_trimestre": {
+          "meta": 10740000,
+          "escala": 18000000,
+          "ponto_equilibrio": 7950000
+        }
+      }
+    }
+  ]
+}
