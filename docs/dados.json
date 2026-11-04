@@ -1,9 +1,9 @@
 {
-  "atualizado_em": "2026-11-03T10:00:11-03:00",
-  "data_corte": "2026-10-31",
+  "atualizado_em": "2026-11-03T09:00:11-03:00",
+  "data_corte": "2026-11-03",
   "fuso_horario": "America/Sao_Paulo",
-  "pedidos_mes": 3694637.67,
-  "faturamento_mes": 1307261.34,
-  "pedidos_trimestre": 3694637.67,
-  "faturamento_trimestre": 1307261.34
+  "pedidos_mes": 22711,07,
+  "faturamento_mes": 4449.60,
+  "pedidos_trimestre": 3717348.74,
+  "faturamento_trimestre": 1311710.94
 }
